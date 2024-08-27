@@ -1,0 +1,48 @@
+Følg denne bloggen for å importere store biler inn i Power bI
+
+https://blog.crossjoin.co.uk/2019/05/19/storing-large-images-in-power-bi-datasets/
+
+https://www.youtube.com/watch?v=W0KyQ6w_-nI
+
+let
+  //Get list of files in folder 
+  Source = Folder.Files("C:\Users\Chris\Documents\PQ Pics"),
+  //Remove unnecessary columns 
+  RemoveOtherColumns = Table.SelectColumns(Source, {"Content", "Name"}),
+  //Creates Splitter function 
+  SplitTextFunction = Splitter.SplitTextByRepeatedLengths(30000),
+  //Converts table of files to list 
+  ListInput = Table.ToRows(RemoveOtherColumns),
+  //Function to convert binary of photo to multiple 
+  //text values 
+  ConvertOneFile = (InputRow as list) =>
+    let
+      BinaryIn    = InputRow{0},
+      FileName    = InputRow{1},
+      BinaryText  = Binary.ToText(BinaryIn, BinaryEncoding.Base64),
+      SplitUpText = SplitTextFunction(BinaryText),
+      AddFileName = List.Transform(SplitUpText, each {FileName, _})
+    in
+      AddFileName,
+  //Loops over all photos and calls the above function 
+  ConvertAllFiles = List.Transform(ListInput, each ConvertOneFile(_)),
+  //Combines lists together 
+  CombineLists = List.Combine(ConvertAllFiles),
+  //Converts results to table 
+  ToTable = #table(type table [Name = text, Pic = text], CombineLists),
+  //Adds index column to output table 
+  AddIndexColumn = Table.AddIndexColumn(ToTable, "Index", 0, 1)
+in
+  AddIndexColumn
+
+
+
+Measure needen
+
+Display Image = 
+IF( HASONEVALUE('PQ Pics'[Name]), 
+"data:image/jpeg;base64, " & 
+CONCATENATEX( 'PQ Pics', 'PQ Pics'[Pic], , 'PQ Pics'[Index], ASC) )
+
+
+
